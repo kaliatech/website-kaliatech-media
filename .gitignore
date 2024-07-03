@@ -1,0 +1,22 @@
+# working directories
+kt-media-root/**/*.JPG
+kt-media-root/**/*.jpg
+kt-media-root/**/*.jpeg
+kt-media-root/**/*.png
+kt-media-root/**/*.md
+kt-media-root/**/*.mp4
+kt-media-root/**/*.txt
+
+kt-media-root-processed*
+
+# build output
+target/
+
+# environment variables
+*.local
+
+# macOS-specific files
+.DS_Store
+
+# jetbrains setting folder
+.idea/
