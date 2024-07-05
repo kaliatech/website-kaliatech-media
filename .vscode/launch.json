@@ -9,7 +9,12 @@
             "request": "launch",
             "name": "Debug",
             "program": "${workspaceFolder}/kt-media-processor/target/debug/kt-media-processor",
-            "args": [],
+            "args": [
+                "--inDir",
+                "../kt-media-root",
+                "--outDir",
+                "../kt-media-processed"
+            ],
             "cwd": "${workspaceFolder}/kt-media-processor",
         }
     ]

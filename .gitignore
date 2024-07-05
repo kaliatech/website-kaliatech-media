@@ -9,6 +9,8 @@ kt-media-root/**/*.txt
 
 kt-media-root-processed*
 
+kt-media-root-temp
+
 # build output
 target/
 
