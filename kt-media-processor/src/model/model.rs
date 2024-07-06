@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 use std::rc::Rc;
@@ -23,9 +24,9 @@ pub struct MediaAlbumMeta {
     )]
     pub last_modified: Option<DateTime<Utc>>,
     #[serde(default)]
-    pub sub_albums: HashMap<String, MediaAlbumMeta>,
+    pub sub_albums: HashMap<String, Rc<RefCell<MediaAlbumMeta>>>,
     #[serde(default)]
-    pub media_files: HashMap<String, Rc<MediaFileMeta>>,
+    pub media_files: HashMap<String, Rc<RefCell<MediaFileMeta>>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -49,8 +50,8 @@ pub struct MediaAlbum {
         deserialize_with = "utils::deserialize_dt"
     )]
     pub last_modified: DateTime<Utc>,
-    pub sub_albums: HashMap<String, MediaAlbum>,
-    pub media_files: HashMap<String, MediaFile>,
+    pub sub_albums: HashMap<String, Rc<RefCell<MediaAlbum>>>,
+    pub media_files: HashMap<String, Rc<RefCell<MediaFile>>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
