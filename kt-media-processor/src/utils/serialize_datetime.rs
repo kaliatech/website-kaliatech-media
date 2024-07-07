@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use serde::{self, Deserialize, Deserializer, Serializer};
 
 // const FORMAT: &str = "%Y-%m-%d %H:%M:%S";
@@ -21,7 +21,7 @@ pub fn serialize_dt<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::
 where
     S: Serializer,
 {
-    let s = date.to_rfc3339();
+    let s = date.to_rfc3339_opts(SecondsFormat::Millis, true);
     serializer.serialize_str(&s)
 }
 
@@ -41,7 +41,7 @@ where
 {
     match date {
         Some(date) => {
-            let s = date.to_rfc3339();
+            let s = date.to_rfc3339_opts(SecondsFormat::Millis, true);
             serializer.serialize_some(&s)
         }
         None => serializer.serialize_none(),
