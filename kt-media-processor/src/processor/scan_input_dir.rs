@@ -168,18 +168,24 @@ pub fn scan_input_dir(input_path: &Path) -> Result<Box<ScanResult>, Box<dyn Erro
                 // } else {
 
                 //TODO: The get_mut here is not safe
-                media_album_meta.and_modify(|media_album_meta| {
-                    if let Some(album_meta) = Rc::get_mut(media_album_meta) {
-                        (*album_meta)
-                            .borrow_mut()
-                            .media_files
-                            .insert(file_path.clone(), Rc::clone(&media_file_meta));
-                    }
-                    // Rc::get_mut(media_album_meta)
-                    //     .unwrap()
-                    //     .media_files
-                    //     .insert(file_path.clone(), Rc::clone(&media_file_meta));
+
+                media_album_meta.and_modify(|album_meta| {
+                    album_meta
+                        .borrow_mut()
+                        .media_files
+                        .insert(file_path.clone(), Rc::clone(&media_file_meta));
                 });
+                // if let Some(album_meta) = media_album_meta {
+                //     (*album_meta)
+                //         .borrow_mut()
+                //         .media_files
+                //         .insert(file_path.clone(), Rc::clone(&media_file_meta));
+                // }
+                // Rc::get_mut(media_album_meta)
+                //     .unwrap()
+                //     .media_files
+                //     .insert(file_path.clone(), Rc::clone(&media_file_meta));
+                // });
                 // .and_modify(|album_meta| {
                 //     album_meta
                 //         .media_files
