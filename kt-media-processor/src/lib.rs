@@ -4,6 +4,7 @@ use chrono::Utc;
 
 pub mod model;
 pub mod processor;
+pub mod scanner;
 pub mod utils;
 
 pub fn scan_and_process_media(
@@ -17,13 +18,14 @@ pub fn scan_and_process_media(
     let out_dir_path_tmp = format!("{}-{}", out_dir, timestamp);
     let out_dir_path = Path::new(&out_dir_path_tmp);
 
-    let scan_result = processor::scan_input_dir(in_dir_path)?;
-    let scan_data = serde_json::to_string_pretty(&scan_result.media_album_metas)?;
-    println!("Scan: {}", scan_data);
+    let scanned_result = scanner::scan_input_dir(in_dir_path)?;
+    let scanned_data = serde_json::to_string_pretty(&scanned_result.media_album_metas)?;
+    println!("Scanned: {}", scanned_data);
 
-    let output_result = processor::process_input_meta(in_dir_path, out_dir_path, &scan_result)?;
-    let output_data = serde_json::to_string_pretty(&output_result.media_albums)?;
-    println!("Output: {}", output_data);
+    let processed_result =
+        processor::process_input_meta(in_dir_path, out_dir_path, &scanned_result)?;
+    let processed_data = serde_json::to_string_pretty(&processed_result.media_albums)?;
+    println!("Processed: {}", processed_data);
 
     Ok(())
 }
