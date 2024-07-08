@@ -30,7 +30,8 @@ pub fn process_input_meta(
     let media_file_metas = &scan_result.media_file_metas;
 
     if let Some(media_album_meta) = media_album_metas.get("") {
-        let root_media_album = process_album(output_path, &String::from(""), media_album_meta)?;
+        let root_media_album =
+            process_album(input_path, output_path, &String::from(""), media_album_meta)?;
         media_albums.insert(String::from(""), Rc::clone(&root_media_album));
     }
 
@@ -53,6 +54,7 @@ pub fn process_input_meta(
 }
 
 fn process_album(
+    input_path: &Path,
     output_path: &Path,
     media_album_meta_path_str: &str,
     media_album_meta: &Rc<RefCell<model::MediaAlbumMeta>>,
@@ -71,6 +73,7 @@ fn process_album(
         media_files: HashMap::new(),
     }));
 
+    // Iterate all files of the album
     for (media_file_meta_path, media_file_meta) in &media_album_meta.media_files {
         let media_file_meta = media_file_meta.borrow();
         let media_file = Rc::new(RefCell::new(model::MediaFile {
@@ -79,6 +82,22 @@ fn process_album(
             ordinal: media_file_meta.ordinal,
             last_modified_file: media_file_meta.last_modified_file,
         }));
+
+        // resize, generate thumbnails, etc
+        let file_src_path = &input_path.join(
+            &media_file_meta_path
+                .strip_prefix("/")
+                .unwrap_or(media_album_meta_path_str),
+        );
+
+        crate::processor::process_file(
+            file_src_path,
+            output_path,
+            media_file_meta,
+            media_file.borrow(),
+        )?;
+
+        // insert to the album
         media_album
             .borrow_mut()
             .media_files
@@ -86,12 +105,19 @@ fn process_album(
     }
     for (sub_album_meta_path, sub_album_meta) in &media_album_meta.sub_albums {
         // Recursively process sub-albums
-        let sub_media_album = process_album(output_path, &sub_album_meta_path, sub_album_meta)?;
+        let sub_media_album = process_album(
+            input_path,
+            output_path,
+            &sub_album_meta_path,
+            sub_album_meta,
+        )?;
         let _ = &media_album
             .borrow_mut()
             .sub_albums
             .insert(sub_album_meta_path.clone(), Rc::clone(&sub_media_album));
     }
+
+    //TODO: Only write a new album.json if the last_modified_dir is newer than existing album.json (if any) last modified
 
     // Write album.json
     let file_out_path = output_path
@@ -104,19 +130,6 @@ fn process_album(
 
     // dbg!(&output_path);
     // dbg!(&file_out_path);
-
-    // if !file_out_path
-    //     .parent()
-    //     .expect("Parent directory should exist")
-    //     .exists()
-    // {
-    //     println!("Creating output directory: {:?}", &file_out_path.parent());
-    //     std::fs::create_dir_all(
-    //         &file_out_path
-    //             .parent()
-    //             .expect("Parent directory should exist"),
-    //     )?;
-    // }
 
     if let Some(parent_dir) = file_out_path.parent() {
         if !parent_dir.exists() {
