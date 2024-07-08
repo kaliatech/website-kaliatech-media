@@ -94,6 +94,8 @@ pub struct MediaFile {
         deserialize_with = "utils::deserialize_dt"
     )]
     pub last_modified: DateTime<Utc>,
+    pub width: u32,
+    pub height: u32,
     pub variants: HashMap<String, Rc<RefCell<MediaFileVariant>>>,
 }
 

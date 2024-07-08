@@ -27,7 +27,7 @@ pub fn process_input_meta(
     let media_files: HashMap<String, Rc<RefCell<model::MediaFile>>> = HashMap::new();
 
     let media_album_metas = &scan_result.media_album_metas;
-    let media_file_metas = &scan_result.media_file_metas;
+    let _media_file_metas = &scan_result.media_file_metas;
 
     if let Some(media_album_meta) = media_album_metas.get("") {
         let root_media_album =
@@ -81,6 +81,8 @@ fn process_album(
             title: media_file_meta.title.clone(),
             ordinal: media_file_meta.ordinal,
             last_modified: media_file_meta.last_modified_file,
+            width: 0,
+            height: 0,
             variants: HashMap::new(),
         }));
 

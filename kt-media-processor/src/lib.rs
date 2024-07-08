@@ -19,12 +19,12 @@ pub fn scan_and_process_media(
     let out_dir_path = Path::new(&out_dir_path_tmp);
 
     let scanned_result = scanner::scan_input_dir(in_dir_path)?;
-    let scanned_data = serde_json::to_string_pretty(&scanned_result.media_album_metas)?;
+    //let scanned_data = serde_json::to_string_pretty(&scanned_result.media_album_metas)?;
     //println!("Scanned: {}", scanned_data);
 
-    let processed_result =
+    let _processed_result =
         processor::process_input_meta(in_dir_path, out_dir_path, &scanned_result)?;
-    let processed_data = serde_json::to_string_pretty(&processed_result.media_albums)?;
+    //let processed_data = serde_json::to_string_pretty(&processed_result.media_albums)?;
     //println!("Processed: {}", processed_data);
 
     Ok(())

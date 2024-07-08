@@ -6,7 +6,6 @@ use std::path::Path;
 use std::fs;
 use std::fs::File;
 use std::io::BufWriter;
-use std::io::Write;
 
 use crate::model;
 use std::cell::Ref;
@@ -19,14 +18,13 @@ use image::GenericImageView;
 use image::codecs::avif::AvifEncoder;
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::webp::WebPEncoder;
-use image::ImageEncoder;
 
 use std::time::Instant;
 
 pub fn process_file(
     file_src_path: &Path,
     output_path: &Path,
-    media_file_meta: Ref<model::MediaFileMeta>,
+    _media_file_meta: Ref<model::MediaFileMeta>,
     mut media_file: RefMut<model::MediaFile>,
 ) -> Result<(), Box<dyn Error>> {
     //todo!();
@@ -57,10 +55,14 @@ pub fn process_file(
 
     dbg!(file_src_path.to_str());
 
-    let g = ImageReader::open(file_src_path)?.with_guessed_format()?;
-    println!("Format: {}", g.format().unwrap().to_mime_type());
+    // let g = ImageReader::open(file_src_path)?.with_guessed_format()?;
+    // println!("Format: {}", g.format().unwrap().to_mime_type());
 
     let src_img = ImageReader::open(file_src_path)?.decode()?;
+    let (src_dim_w, src_dim_h) = src_img.dimensions();
+
+    media_file.width = src_dim_w;
+    media_file.height = src_dim_h;
 
     // dbg!(file_img_1280x720_path.to_str());
     // //let img_500x500 = img.resize(500, 500, image::imageops::FilterType::CatmullRom);
@@ -76,102 +78,115 @@ pub fn process_file(
     // img_1280x720.write_with_encoder(encoder)?;
 
     let output_formats = [
+        // model::MediaEncodingRequest {
+        //     width: 1280,
+        //     height: 720,
+        //     encoding: model::Encoding::JPEG,
+        //     keep_aspect: false,
+        // },
+        // model::MediaEncodingRequest {
+        //     width: 1920,
+        //     height: 1920,
+        //     encoding: model::Encoding::JPEG,
+        //     keep_aspect: true,
+        // },
+        // model::MediaEncodingRequest {
+        //     width: 3840,
+        //     height: 3840,
+        //     encoding: model::Encoding::JPEG,
+        //     keep_aspect: true,
+        // },
+        // model::MediaEncodingRequest {
+        //     width: 1280,
+        //     height: 720,
+        //     encoding: model::Encoding::WEBP,
+        //     keep_aspect: false,
+        // },
+        // model::MediaEncodingRequest {
+        //     width: 1920,
+        //     height: 1920,
+        //     encoding: model::Encoding::WEBP,
+        //     keep_aspect: true,
+        // },
+        // model::MediaEncodingRequest {
+        //     width: 3840,
+        //     height: 3840,
+        //     encoding: model::Encoding::WEBP,
+        //     keep_aspect: true,
+        // },
         model::MediaEncodingRequest {
             width: 1280,
             height: 720,
-            encoding: model::Encoding::JPEG,
+            encoding: model::Encoding::AVIF,
             keep_aspect: false,
         },
-        // model::MediaEncodingRequest {
-        //     width: 1920,
-        //     height: 1920,
-        //     encoding: model::Encoding::JPEG,
-        //     keep_aspect: true,
-        // },
-        // model::MediaEncodingRequest {
-        //     width: 3840,
-        //     height: 3840,
-        //     encoding: model::Encoding::JPEG,
-        //     keep_aspect: true,
-        // },
-        // model::MediaEncodingRequest {
-        //     width: 1280,
-        //     height: 720,
-        //     encoding: model::Encoding::WEBP,
-        //     keep_aspect: false,
-        // },
-        // model::MediaEncodingRequest {
-        //     width: 1920,
-        //     height: 1920,
-        //     encoding: model::Encoding::WEBP,
-        //     keep_aspect: true,
-        // },
-        // model::MediaEncodingRequest {
-        //     width: 3840,
-        //     height: 3840,
-        //     encoding: model::Encoding::WEBP,
-        //     keep_aspect: true,
-        // },
-        // model::MediaEncodingRequest {
-        //     width: 1280,
-        //     height: 720,
-        //     encoding: model::Encoding::AVIF,
-        //     keep_aspect: false,
-        // },
         model::MediaEncodingRequest {
             width: 1920,
             height: 1920,
             encoding: model::Encoding::AVIF,
             keep_aspect: true,
         },
-        // model::MediaEncodingRequest {
-        //     width: 3840,
-        //     height: 3840,
-        //     encoding: model::Encoding::AVIF,
-        //     keep_aspect: true,
-        // },
+        model::MediaEncodingRequest {
+            width: 3840,
+            height: 3840,
+            encoding: model::Encoding::AVIF,
+            keep_aspect: true,
+        },
     ];
 
     for output_format in &output_formats {
-        let (dim_w, dim_h) = src_img.dimensions();
+        // TODO: Generated expected output name
+
+        // If file exists and last_modified is after the last_modified of the source file
+        // and the given meta, then skip actual final resizing and generation
 
         // Resize and crop as needed
         let img_out = match output_format.keep_aspect {
             true => {
-                //src_img.thumbnail_exact(output_format.width, output_format.height),
-                src_img.resize(
-                    output_format.width,
-                    output_format.height,
-                    image::imageops::FilterType::Lanczos3,
-                )
+                if src_dim_w < output_format.width && src_dim_h < output_format.height {
+                    // Skip if source is smaller than target
+                    continue;
+                } else {
+                    //src_img.thumbnail_exact(output_format.width, output_format.height),
+                    src_img.resize(
+                        output_format.width,
+                        output_format.height,
+                        image::imageops::FilterType::Lanczos3,
+                    )
+                }
             }
 
             false => {
                 let target_aspect_ratio = output_format.width as f64 / output_format.height as f64;
-                let src_aspect_ratio = dim_w as f64 / dim_h as f64;
+                let src_aspect_ratio = src_dim_w as f64 / src_dim_h as f64;
 
                 let (crop_width, crop_height) = if src_aspect_ratio > target_aspect_ratio {
                     // Source is wider than target, crop horizontally
-                    let crop_height = dim_h;
+                    let crop_height = src_dim_h;
                     let crop_width = (crop_height as f64 * target_aspect_ratio) as u32;
                     (crop_width, crop_height)
                 } else {
                     // Source is taller than target, crop vertically
-                    let crop_width = dim_w;
+                    let crop_width = src_dim_w;
                     let crop_height = (crop_width as f64 / target_aspect_ratio) as u32;
                     (crop_width, crop_height)
                 };
 
                 // Calculate top-left corner for crop to center it
-                let x = (dim_w - crop_width) / 2;
-                let y = (dim_h - crop_height) / 2;
+                let x = (src_dim_w - crop_width) / 2;
+                let y = (src_dim_h - crop_height) / 2;
 
                 let cropped_img = &src_img.crop_imm(x, y, crop_width, crop_height);
-                cropped_img.resize(
-                    output_format.width,
-                    output_format.height,
-                    image::imageops::FilterType::Lanczos3,
-                )
+                let (dim_cropped_w, dim_cropped_h) = cropped_img.dimensions();
+                if dim_cropped_w < output_format.width && dim_cropped_h < output_format.height {
+                    cropped_img.to_owned()
+                } else {
+                    cropped_img.resize(
+                        output_format.width,
+                        output_format.height,
+                        image::imageops::FilterType::Lanczos3,
+                    )
+                }
             }
         };
 
@@ -181,20 +196,18 @@ pub fn process_file(
         let mut file_img_subpath_ext_str = file_img_subpath_str.clone();
         file_img_subpath_ext_str = file_img_subpath_ext_str + ".";
         if output_format.keep_aspect {
-            if dim_w > dim_h {
-                file_img_subpath_ext_str =
-                    file_img_subpath_ext_str + &output_format.width.to_string();
+            if src_dim_w > src_dim_h {
+                file_img_subpath_ext_str = file_img_subpath_ext_str + &dim_resized_w.to_string();
                 file_img_subpath_ext_str = file_img_subpath_ext_str + "w.";
             } else {
-                file_img_subpath_ext_str =
-                    file_img_subpath_ext_str + &output_format.height.to_string();
+                file_img_subpath_ext_str = file_img_subpath_ext_str + &dim_resized_h.to_string();
                 file_img_subpath_ext_str = file_img_subpath_ext_str + "h.";
             }
         } else {
             file_img_subpath_ext_str = file_img_subpath_ext_str
-                + &output_format.width.to_string()
+                + &dim_resized_w.to_string()
                 + "x"
-                + &output_format.height.to_string()
+                + &dim_resized_h.to_string()
                 + ".";
         }
 
@@ -207,11 +220,10 @@ pub fn process_file(
             }
             model::Encoding::AVIF => {
                 file_img_subpath_ext_str = file_img_subpath_ext_str + "avif";
-            }
-            _ => {
-                file_img_subpath_ext_str = file_img_subpath_ext_str + "unknown";
-                eprintln!("Unsupported encoding");
-            }
+            } // _ => {
+              //     file_img_subpath_ext_str = file_img_subpath_ext_str + "unknown";
+              //     eprintln!("Unsupported encoding");
+              // }
         };
 
         // .with_file_name(
@@ -258,7 +270,7 @@ pub fn process_file(
                     model::Encoding::JPEG => "image/jpeg".to_string(),
                     model::Encoding::WEBP => "image/webp".to_string(),
                     model::Encoding::AVIF => "image/avif".to_string(),
-                    _ => "image/unknown".to_string(),
+                    // _ => "image/unknown".to_string(),
                 },
                 width: dim_resized_w,
                 height: dim_resized_h,
