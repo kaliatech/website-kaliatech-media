@@ -80,7 +80,8 @@ fn process_album(
             path: media_file_meta_path.clone(),
             title: media_file_meta.title.clone(),
             ordinal: media_file_meta.ordinal,
-            last_modified_file: media_file_meta.last_modified_file,
+            last_modified: media_file_meta.last_modified_file,
+            variants: HashMap::new(),
         }));
 
         // resize, generate thumbnails, etc
@@ -94,7 +95,7 @@ fn process_album(
             file_src_path,
             output_path,
             media_file_meta,
-            media_file.borrow(),
+            media_file.borrow_mut(),
         )?;
 
         // insert to the album

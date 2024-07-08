@@ -38,6 +38,19 @@ pub struct MediaAlbumMeta {
     pub media_files: HashMap<String, Rc<RefCell<MediaFileMeta>>>,
 }
 
+pub enum Encoding {
+    JPEG,
+    AVIF,
+    WEBP,
+}
+
+pub struct MediaEncodingRequest {
+    pub encoding: Encoding,
+    pub width: u32,
+    pub height: u32,
+    pub keep_aspect: bool, // if fa, image will be cropped to center
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MediaFileMeta {
     pub title: String,
@@ -80,5 +93,16 @@ pub struct MediaFile {
         serialize_with = "utils::serialize_dt",
         deserialize_with = "utils::deserialize_dt"
     )]
-    pub last_modified_file: DateTime<Utc>,
+    pub last_modified: DateTime<Utc>,
+    pub variants: HashMap<String, Rc<RefCell<MediaFileVariant>>>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MediaFileVariant {
+    pub path: String,
+    pub mime_type: String,
+    pub width: u32,
+    pub height: u32,
+    pub bytes: u32,
+    pub is_thumbnail: bool,
 }

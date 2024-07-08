@@ -209,6 +209,14 @@ fn scan_file(
     }
 
     //TODO: Filter for only file extensions we can support
+    let ext = file_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or_default()
+        .to_lowercase();
+    if !["jpg", "jpeg", "png", "gif", "mp4", "avif", "webp"].contains(&ext.as_str()) {
+        return Ok(());
+    }
 
     // If here, file is a media file we need to check and process
     let last_modified_file = match file_path.metadata() {
