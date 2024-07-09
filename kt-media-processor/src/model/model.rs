@@ -94,6 +94,7 @@ pub struct MediaFile {
     pub path: String,
     pub title: String,
     pub ordinal: i32,
+    pub media_type: MediaFileType,
     #[serde(
         serialize_with = "utils::serialize_dt",
         deserialize_with = "utils::deserialize_dt"
@@ -110,6 +111,16 @@ pub struct MediaFileVariant {
     pub mime_type: String,
     pub width: u32,
     pub height: u32,
+    pub duration: Option<f64>,
     pub bytes: u32,
     pub is_thumbnail: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum MediaFileType {
+    UNKNOWN,
+    IMAGE,
+    VIDEO,
+    IMAGE360,
+    VIDEO360,
 }

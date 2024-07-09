@@ -1,5 +1,5 @@
 use std::borrow::BorrowMut;
-use std::cell::RefMut;
+
 use std::error::Error;
 use std::path::Path;
 
@@ -9,7 +9,7 @@ use std::io::BufWriter;
 
 use crate::model;
 use crate::processor::generate_filename;
-use std::cell::Ref;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -23,15 +23,17 @@ use image::codecs::webp::WebPEncoder;
 
 use std::time::Instant;
 
+use super::config;
+
 pub fn process_file(
-    file_src_path: &Path,
+    src_path: &Path,
     output_path: &Path,
-    _media_file_meta: Ref<model::MediaFileMeta>,
+    _media_file_meta: &model::MediaFileMeta,
     media_file: &mut model::MediaFile,
 ) -> Result<(), Box<dyn Error>> {
     //todo!();
 
-    let file_img_subpath_str = format!(
+    let src_subpath_noext_str = format!(
         "{}",
         media_file
             .path
@@ -39,109 +41,32 @@ pub fn process_file(
             .unwrap_or(&media_file.path)
             .trim_end_matches(&format!(
                 ".{}",
-                file_src_path
-                    .extension()
-                    .unwrap_or_default()
-                    .to_string_lossy()
+                src_path.extension().unwrap_or_default().to_string_lossy()
             ))
     );
-    let file_img_base_path = output_path.join(&file_img_subpath_str);
+    let src_subpath_noext = output_path.join(&src_subpath_noext_str);
 
-    if let Some(parent) = file_img_base_path.parent() {
+    if let Some(parent) = src_subpath_noext.parent() {
         fs::create_dir_all(parent)?;
     }
-
-    //500w
-    //1980w
-    //3840w
-
-    dbg!(file_src_path.to_str());
 
     // let g = ImageReader::open(file_src_path)?.with_guessed_format()?;
     // println!("Format: {}", g.format().unwrap().to_mime_type());
 
     // This might be problematic is only being done to here determine if file has been modified
-    let src_img = ImageReader::open(file_src_path)?.decode()?;
-    let (src_dim_w, src_dim_h) = src_img.dimensions();
-
     //TODO: Maybe check with a known file first to determine modified instead of opening/decoding every file
+
+    let src_img = ImageReader::open(src_path)?.decode()?;
+    let (src_dim_w, src_dim_h) = src_img.dimensions();
 
     media_file.width = src_dim_w;
     media_file.height = src_dim_h;
 
-    // dbg!(file_img_1280x720_path.to_str());
-    // //let img_500x500 = img.resize(500, 500, image::imageops::FilterType::CatmullRom);
-    // let img_1280x720 = src_img.thumbnail_exact(1280, 720);
-
-    // let file = File::create(&file_img_1280x720_path)?;
-    // let mut buffered_file_writer = BufWriter::new(file);
-
-    // Avif Defaults:
-    //  speed: 4
-    //  quality: 80
-    // let encoder = AvifEncoder::new_with_speed_quality(&mut buffered_file_writer, 4, 80);
-
-    let output_formats = [
-        // model::MediaEncodingRequest {
-        //     width: 1280,
-        //     height: 720,
-        //     encoding: model::Encoding::JPEG,
-        //     keep_aspect: false,
-        // },
-        // model::MediaEncodingRequest {
-        //     width: 1920,
-        //     height: 1920,
-        //     encoding: model::Encoding::JPEG,
-        //     keep_aspect: true,
-        // },
-        // model::MediaEncodingRequest {
-        //     width: 3840,
-        //     height: 3840,
-        //     encoding: model::Encoding::JPEG,
-        //     keep_aspect: true,
-        // },
-        // model::MediaEncodingRequest {
-        //     width: 1280,
-        //     height: 720,
-        //     encoding: model::Encoding::WEBP,
-        //     keep_aspect: false,
-        // },
-        // model::MediaEncodingRequest {
-        //     width: 1920,
-        //     height: 1920,
-        //     encoding: model::Encoding::WEBP,
-        //     keep_aspect: true,
-        // },
-        // model::MediaEncodingRequest {
-        //     width: 3840,
-        //     height: 3840,
-        //     encoding: model::Encoding::WEBP,
-        //     keep_aspect: true,
-        // },
-        model::MediaEncodingRequest {
-            width: 1280,
-            height: 720,
-            encoding: model::Encoding::AVIF,
-            keep_aspect: false,
-        },
-        model::MediaEncodingRequest {
-            width: 1920,
-            height: 1920,
-            encoding: model::Encoding::AVIF,
-            keep_aspect: true,
-        },
-        // model::MediaEncodingRequest {
-        //     width: 3840,
-        //     height: 3840,
-        //     encoding: model::Encoding::AVIF,
-        //     keep_aspect: true,
-        // },
-    ];
-
+    let output_formats = config::get_output_formats();
     for output_format in &output_formats {
         // Generated expected output name
         let (expected_subpath_ext_str, actual_dim_w, actual_dim_h) =
-            generate_filename(&file_img_subpath_str, output_format, src_dim_w, src_dim_h);
+            generate_filename(&src_subpath_noext_str, output_format, src_dim_w, src_dim_h);
 
         println!("Considering: {}", expected_subpath_ext_str);
 
@@ -151,7 +76,7 @@ pub fn process_file(
 
         if expected_path.exists() {
             let expected_last_modified = fs::metadata(expected_path).unwrap().modified()?;
-            if expected_last_modified >= file_src_path.metadata()?.modified()?
+            if expected_last_modified >= src_path.metadata()?.modified()?
                 && expected_last_modified >= media_file.last_modified.into()
             {
                 println!("Skipping: {}", expected_subpath_ext_str);
@@ -290,6 +215,7 @@ pub fn process_file(
                 },
                 width: dim_resized_w,
                 height: dim_resized_h,
+                duration: None,
                 bytes: u32::try_from(file_out.metadata().unwrap().len()).unwrap_or(0),
                 is_thumbnail: !output_format.keep_aspect,
             })),
