@@ -38,12 +38,14 @@ pub struct MediaAlbumMeta {
     pub media_files: HashMap<String, Rc<RefCell<MediaFileMeta>>>,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Encoding {
     JPEG,
     AVIF,
     WEBP,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MediaEncodingRequest {
     pub encoding: Encoding,
     pub width: u32,

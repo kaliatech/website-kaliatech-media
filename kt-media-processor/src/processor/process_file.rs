@@ -8,6 +8,7 @@ use std::fs::File;
 use std::io::BufWriter;
 
 use crate::model;
+use crate::processor::generate_filename;
 use std::cell::Ref;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -20,6 +21,8 @@ use image::codecs::jpeg::JpegEncoder;
 use image::codecs::webp::WebPEncoder;
 
 use std::time::Instant;
+
+use std::cmp;
 
 pub fn process_file(
     file_src_path: &Path,
@@ -58,8 +61,11 @@ pub fn process_file(
     // let g = ImageReader::open(file_src_path)?.with_guessed_format()?;
     // println!("Format: {}", g.format().unwrap().to_mime_type());
 
+    // This might be problematic is only being done to here determine if file has been modified
     let src_img = ImageReader::open(file_src_path)?.decode()?;
     let (src_dim_w, src_dim_h) = src_img.dimensions();
+
+    //TODO: Maybe check with a known file first to determine modified instead of opening/decoding every file
 
     media_file.width = src_dim_w;
     media_file.height = src_dim_h;
@@ -75,7 +81,6 @@ pub fn process_file(
     //  speed: 4
     //  quality: 80
     // let encoder = AvifEncoder::new_with_speed_quality(&mut buffered_file_writer, 4, 80);
-    // img_1280x720.write_with_encoder(encoder)?;
 
     let output_formats = [
         // model::MediaEncodingRequest {
@@ -126,114 +131,147 @@ pub fn process_file(
             encoding: model::Encoding::AVIF,
             keep_aspect: true,
         },
-        model::MediaEncodingRequest {
-            width: 3840,
-            height: 3840,
-            encoding: model::Encoding::AVIF,
-            keep_aspect: true,
-        },
+        // model::MediaEncodingRequest {
+        //     width: 3840,
+        //     height: 3840,
+        //     encoding: model::Encoding::AVIF,
+        //     keep_aspect: true,
+        // },
     ];
 
     for output_format in &output_formats {
-        // TODO: Generated expected output name
+        // Generated expected output name
+        let (expected_subpath_ext_str, actual_dim_w, actual_dim_h) =
+            generate_filename(&file_img_subpath_str, output_format, src_dim_w, src_dim_h);
+
+        println!("Considering: {}", expected_subpath_ext_str);
 
         // If file exists and last_modified is after the last_modified of the source file
         // and the given meta, then skip actual final resizing and generation
+        let expected_path = &output_path.join(&expected_subpath_ext_str);
 
+        if expected_path.exists()
+            && fs::metadata(expected_path).unwrap().modified()?
+                > file_src_path.metadata()?.modified()?
+        //&& (File::new(expected_path).metadata()?.modified()? > media_file.last_modified)
+        {
+            println!("Skipping: {}", expected_subpath_ext_str);
+            continue;
+        }
+
+        println!("Processing: {}", expected_subpath_ext_str);
         // Resize and crop as needed
         let img_out = match output_format.keep_aspect {
             true => {
-                if src_dim_w < output_format.width && src_dim_h < output_format.height {
-                    // Skip if source is smaller than target
-                    continue;
+                dbg!("keep_aspect");
+                dbg!(actual_dim_w);
+                dbg!(actual_dim_h);
+                dbg!(output_format);
+
+                if actual_dim_w < output_format.width || actual_dim_h < output_format.height {
+                    dbg!("clone");
+                    src_img.clone()
                 } else {
                     //src_img.thumbnail_exact(output_format.width, output_format.height),
-                    src_img.resize(
-                        output_format.width,
-                        output_format.height,
+                    //we calculated actuals, so we use exact
+                    dbg!("resize");
+                    let now = Instant::now();
+                    let resized_img = src_img.resize_exact(
+                        actual_dim_w,
+                        actual_dim_h,
                         image::imageops::FilterType::Lanczos3,
-                    )
+                    );
+                    let elapsed = now.elapsed();
+                    println!(
+                        "{}, Resize Time: {:.2?}",
+                        &expected_subpath_ext_str, elapsed
+                    );
+                    resized_img
                 }
             }
 
             false => {
-                let target_aspect_ratio = output_format.width as f64 / output_format.height as f64;
-                let src_aspect_ratio = src_dim_w as f64 / src_dim_h as f64;
-
-                let (crop_width, crop_height) = if src_aspect_ratio > target_aspect_ratio {
-                    // Source is wider than target, crop horizontally
-                    let crop_height = src_dim_h;
-                    let crop_width = (crop_height as f64 * target_aspect_ratio) as u32;
-                    (crop_width, crop_height)
-                } else {
-                    // Source is taller than target, crop vertically
-                    let crop_width = src_dim_w;
-                    let crop_height = (crop_width as f64 / target_aspect_ratio) as u32;
-                    (crop_width, crop_height)
-                };
-
-                // Calculate top-left corner for crop to center it
-                let x = (src_dim_w - crop_width) / 2;
-                let y = (src_dim_h - crop_height) / 2;
-
-                let cropped_img = &src_img.crop_imm(x, y, crop_width, crop_height);
-                let (dim_cropped_w, dim_cropped_h) = cropped_img.dimensions();
-                if dim_cropped_w < output_format.width && dim_cropped_h < output_format.height {
-                    cropped_img.to_owned()
-                } else {
-                    cropped_img.resize(
-                        output_format.width,
-                        output_format.height,
+                if actual_dim_w < output_format.width || actual_dim_h < output_format.height {
+                    //src_img.clone()
+                    dbg!("too small");
+                    dbg!(actual_dim_w);
+                    dbg!(actual_dim_h);
+                    dbg!(output_format);
+                    src_img.resize_exact(
+                        actual_dim_w,
+                        actual_dim_h,
                         image::imageops::FilterType::Lanczos3,
                     )
+                    //TODO: debug here I guess
+                } else {
+                    // Calculate top-left corner for crop to center it
+                    let src_ar = src_dim_w as f64 / src_dim_h as f64;
+                    let req_ar = actual_dim_w as f64 / actual_dim_h as f64;
+                    dbg!(src_ar);
+                    dbg!(req_ar);
+
+                    // let mut precrop_size = cmp::min(src_dim_w, actual_dim_w);
+                    // if src_ar < 1.0 && req_ar < 1.0 {
+                    //     precrop_size = cmp::min(src_dim_w, actual_dim_w);
+                    // } else if src_ar > 1.0 && req_ar > 1.0 {
+                    //     precrop_size = cmp::min(src_dim_h, actual_dim_h);
+                    // } else if src_ar > 1.0 && req_ar < 1.0 {
+                    //     precrop_size = cmp::min(src_dim_h, actual_dim_h);
+                    // } else if src_ar < 1.0 && req_ar > 1.0 {
+                    //     precrop_size = cmp::min(src_dim_w, actual_dim_w);
+                    // }
+
+                    let (scale_width, scale_height) = if src_ar > req_ar {
+                        // Scale based on height
+                        let scale_height = actual_dim_h;
+                        let scale_width =
+                            (src_dim_w as f64 * (scale_height as f64 / src_dim_h as f64)) as u32;
+                        (scale_width, scale_height)
+                    } else {
+                        // Scale based on width
+                        let scale_width = actual_dim_w;
+                        let scale_height =
+                            (src_dim_h as f64 * (scale_width as f64 / src_dim_w as f64)) as u32;
+                        (scale_width, scale_height)
+                    };
+
+                    let resized_img = src_img.resize_exact(
+                        scale_width,
+                        scale_height,
+                        image::imageops::FilterType::Lanczos3,
+                    );
+
+                    let (resized_dim_w, resized_dim_h) = resized_img.dimensions();
+
+                    dbg!(src_dim_w);
+                    dbg!(src_dim_h);
+
+                    dbg!(actual_dim_w);
+                    dbg!(actual_dim_h);
+
+                    dbg!(resized_dim_w);
+                    dbg!(resized_dim_h);
+
+                    // Calculate crop start points
+                    let crop_x = if scale_width > actual_dim_w {
+                        (scale_width - actual_dim_w) / 2
+                    } else {
+                        0
+                    };
+                    let crop_y = if scale_height > actual_dim_h {
+                        (scale_height - actual_dim_h) / 2
+                    } else {
+                        0
+                    };
+
+                    resized_img.crop_imm(crop_x, crop_y, actual_dim_w, actual_dim_h)
                 }
             }
         };
 
         let (dim_resized_w, dim_resized_h) = img_out.dimensions();
 
-        //img_out = src_img.thumbnail_exact(1280, 720);
-        let mut file_img_subpath_ext_str = file_img_subpath_str.clone();
-        file_img_subpath_ext_str = file_img_subpath_ext_str + ".";
-        if output_format.keep_aspect {
-            if src_dim_w > src_dim_h {
-                file_img_subpath_ext_str = file_img_subpath_ext_str + &dim_resized_w.to_string();
-                file_img_subpath_ext_str = file_img_subpath_ext_str + "w.";
-            } else {
-                file_img_subpath_ext_str = file_img_subpath_ext_str + &dim_resized_h.to_string();
-                file_img_subpath_ext_str = file_img_subpath_ext_str + "h.";
-            }
-        } else {
-            file_img_subpath_ext_str = file_img_subpath_ext_str
-                + &dim_resized_w.to_string()
-                + "x"
-                + &dim_resized_h.to_string()
-                + ".";
-        }
-
-        match output_format.encoding {
-            model::Encoding::JPEG => {
-                file_img_subpath_ext_str = file_img_subpath_ext_str + "jpg";
-            }
-            model::Encoding::WEBP => {
-                file_img_subpath_ext_str = file_img_subpath_ext_str + "webp";
-            }
-            model::Encoding::AVIF => {
-                file_img_subpath_ext_str = file_img_subpath_ext_str + "avif";
-            } // _ => {
-              //     file_img_subpath_ext_str = file_img_subpath_ext_str + "unknown";
-              //     eprintln!("Unsupported encoding");
-              // }
-        };
-
-        // .with_file_name(
-        //     file_img_1280x720_path
-        //         .file_stem()
-        //         .expect("File should have a stem"),
-        // )
-        // .with_extension("1920w.avif");
-
-        let file_out_path = output_path.join(&file_img_subpath_ext_str); //Path::new(&file_img_subpath_ext_str);
+        let file_out_path = expected_path; //Path::new(&file_img_subpath_ext_str);
         let file_out = &File::create(&file_out_path)?;
         let mut file_out_writer = BufWriter::new(file_out);
 
@@ -260,12 +298,12 @@ pub fn process_file(
               // }
         };
         let elapsed = now.elapsed();
-        println!("{}, Time: {:.2?}", &file_img_subpath_ext_str, elapsed);
+        println!("{}, Write Time: {:.2?}", &expected_subpath_ext_str, elapsed);
 
         media_file.variants.borrow_mut().insert(
-            file_img_subpath_ext_str.clone(),
+            expected_subpath_ext_str.clone(),
             Rc::new(RefCell::new(model::MediaFileVariant {
-                path: file_img_subpath_ext_str.clone(),
+                path: expected_subpath_ext_str.clone(),
                 mime_type: match output_format.encoding {
                     model::Encoding::JPEG => "image/jpeg".to_string(),
                     model::Encoding::WEBP => "image/webp".to_string(),

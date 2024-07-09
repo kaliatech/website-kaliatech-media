@@ -13,7 +13,7 @@
                 "--inDir",
                 "../kt-media-root",
                 "--outDir",
-                "../kt-media-processed"
+                "../kt-media-root-processed"
             ],
             "cwd": "${workspaceFolder}/kt-media-processor",
         }
