@@ -9,8 +9,8 @@ pub fn generate_filename(
     let req_dim_w = dest_req.width;
     let req_dim_h = dest_req.height;
 
-    let mut actual_dim_w = req_dim_w;
-    let mut actual_dim_h = req_dim_h;
+    let mut actual_dim_w;
+    let mut actual_dim_h;
 
     if dest_req.keep_aspect {
         // source is landscape, so size by width

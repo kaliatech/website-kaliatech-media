@@ -5,6 +5,8 @@ use std::collections::HashMap;
 
 use std::rc::Rc;
 
+use indexmap::IndexMap;
+
 use crate::utils;
 
 // #[derive(Serialize, Deserialize)]
@@ -55,8 +57,9 @@ pub struct MediaEncodingRequest {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MediaFileMeta {
-    pub title: String,
-    pub ordinal: i32,
+    #[serde(default)]
+    pub title: Option<String>,
+    pub ordinal: Option<i32>,
     #[serde(
         serialize_with = "utils::serialize_dt_opt",
         deserialize_with = "utils::deserialize_dt_opt",
@@ -82,8 +85,8 @@ pub struct MediaAlbum {
         deserialize_with = "utils::deserialize_dt"
     )]
     pub last_modified_dir: DateTime<Utc>,
-    pub sub_albums: HashMap<String, Rc<RefCell<MediaAlbum>>>,
-    pub media_files: HashMap<String, Rc<RefCell<MediaFile>>>,
+    pub sub_albums: IndexMap<String, Rc<RefCell<MediaAlbum>>>,
+    pub media_files: IndexMap<String, Rc<RefCell<MediaFile>>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -98,7 +101,7 @@ pub struct MediaFile {
     pub last_modified: DateTime<Utc>,
     pub width: u32,
     pub height: u32,
-    pub variants: HashMap<String, Rc<RefCell<MediaFileVariant>>>,
+    pub variants: IndexMap<String, Rc<RefCell<MediaFileVariant>>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

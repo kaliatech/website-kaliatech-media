@@ -1,7 +1,8 @@
+use indexmap::IndexMap;
+
 use crate::scanner::ScanResult;
 
 use std::cell::RefCell;
-use std::collections::HashMap;
 
 use std::rc::Rc;
 
@@ -14,8 +15,8 @@ use std::fs;
 use std::io::Write;
 
 pub struct OutputResult {
-    pub media_albums: HashMap<String, Rc<RefCell<model::MediaAlbum>>>,
-    pub media_files: HashMap<String, Rc<RefCell<model::MediaFile>>>,
+    pub media_albums: IndexMap<String, Rc<RefCell<model::MediaAlbum>>>,
+    pub media_files: IndexMap<String, Rc<RefCell<model::MediaFile>>>,
 }
 
 pub fn process_input_meta(
@@ -23,8 +24,8 @@ pub fn process_input_meta(
     output_path: &Path,
     scan_result: &ScanResult,
 ) -> Result<OutputResult, Box<dyn Error>> {
-    let mut media_albums: HashMap<String, Rc<RefCell<model::MediaAlbum>>> = HashMap::new();
-    let media_files: HashMap<String, Rc<RefCell<model::MediaFile>>> = HashMap::new();
+    let mut media_albums: IndexMap<String, Rc<RefCell<model::MediaAlbum>>> = IndexMap::new();
+    let media_files: IndexMap<String, Rc<RefCell<model::MediaFile>>> = IndexMap::new();
 
     let media_album_metas = &scan_result.media_album_metas;
     let _media_file_metas = &scan_result.media_file_metas;
@@ -53,6 +54,7 @@ pub fn process_input_meta(
     return Ok(output_result);
 }
 
+// Recursive
 fn process_album(
     input_path: &Path,
     output_path: &Path,
@@ -69,21 +71,22 @@ fn process_album(
             .unwrap_or_else(|| "Unknown".to_owned()),
         ordinal: media_album_meta.ordinal.unwrap_or(-1),
         last_modified_dir: media_album_meta.last_modified_dir,
-        sub_albums: HashMap::new(),
-        media_files: HashMap::new(),
+        sub_albums: IndexMap::new(),
+        media_files: IndexMap::new(),
     }));
 
     // Iterate all files of the album
     for (media_file_meta_path, media_file_meta) in &media_album_meta.media_files {
         let media_file_meta = media_file_meta.borrow();
+
         let media_file = Rc::new(RefCell::new(model::MediaFile {
             path: media_file_meta_path.clone(),
-            title: media_file_meta.title.clone(),
-            ordinal: media_file_meta.ordinal,
+            title: media_file_meta.title.clone().unwrap_or(String::from("")),
+            ordinal: media_file_meta.ordinal.unwrap_or(0),
             last_modified: media_file_meta.last_modified_file,
             width: 0,
             height: 0,
-            variants: HashMap::new(),
+            variants: IndexMap::new(),
         }));
 
         // resize, generate thumbnails, etc
@@ -93,18 +96,21 @@ fn process_album(
                 .unwrap_or(media_album_meta_path_str),
         );
 
-        crate::processor::process_file(
-            file_src_path,
-            output_path,
-            media_file_meta,
-            media_file.borrow_mut(),
-        )?;
+        {
+            let mut media_file = media_file.borrow_mut();
+            crate::processor::process_file(
+                file_src_path,
+                output_path,
+                media_file_meta,
+                &mut *media_file,
+            )?;
+        }
 
         // insert to the album
+        let mut media_album = media_album.borrow_mut();
         media_album
-            .borrow_mut()
             .media_files
-            .insert(media_file_meta_path.clone(), media_file);
+            .insert(media_file_meta_path.clone(), Rc::clone(&media_file));
     }
     for (sub_album_meta_path, sub_album_meta) in &media_album_meta.sub_albums {
         // Recursively process sub-albums
@@ -114,13 +120,16 @@ fn process_album(
             &sub_album_meta_path,
             sub_album_meta,
         )?;
-        let _ = &media_album
+        media_album
             .borrow_mut()
             .sub_albums
             .insert(sub_album_meta_path.clone(), Rc::clone(&sub_media_album));
     }
 
     //TODO: Only write a new album.json if the last_modified_dir is newer than existing album.json (if any) last modified
+
+    media_album.borrow_mut().sub_albums.sort_keys();
+    media_album.borrow_mut().media_files.sort_keys();
 
     // Write album.json
     let file_out_path = output_path
@@ -140,10 +149,17 @@ fn process_album(
         }
     }
 
-    let mut file_out = fs::File::create(&file_out_path).expect("Failed to create album.json file");
-
     let album_json_str = serde_json::to_string_pretty(&media_album)?;
 
+    // If album.json already exists and is the same, skip writing
+    if file_out_path.exists() {
+        let existing_album_json_str = fs::read_to_string(&file_out_path)?;
+        if album_json_str == existing_album_json_str {
+            return Ok(media_album);
+        }
+    }
+
+    let mut file_out = fs::File::create(&file_out_path).expect("Failed to create album.json file");
     file_out
         .write_all(album_json_str.as_bytes())
         .expect("Failed to write to album.json");

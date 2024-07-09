@@ -1,7 +1,5 @@
 use std::path::Path;
 
-use chrono::Utc;
-
 pub mod model;
 pub mod processor;
 pub mod scanner;
@@ -11,12 +9,13 @@ pub fn scan_and_process_media(
     in_dir: &str,
     out_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let timestamp = Utc::now().timestamp_millis().to_string();
-
     let in_dir_path = Path::new(in_dir);
 
-    let out_dir_path_tmp = format!("{}-{}", out_dir, timestamp);
-    let out_dir_path = Path::new(&out_dir_path_tmp);
+    // let timestamp = Utc::now().timestamp_millis().to_string();
+    // let out_dir_path_tmp = format!("{}-{}", out_dir, timestamp);
+    // let out_dir_path = Path::new(&out_dir_path_tmp);
+
+    let out_dir_path = Path::new(out_dir);
 
     let scanned_result = scanner::scan_input_dir(in_dir_path)?;
     //let scanned_data = serde_json::to_string_pretty(&scanned_result.media_album_metas)?;

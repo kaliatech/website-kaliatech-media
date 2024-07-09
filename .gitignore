@@ -1,4 +1,4 @@
-# working directories
+# media directories
 kt-media-root/**/*.JPG
 kt-media-root/**/*.jpg
 kt-media-root/**/*.jpeg
@@ -6,9 +6,10 @@ kt-media-root/**/*.png
 kt-media-root/**/*.md
 kt-media-root/**/*.mp4
 kt-media-root/**/*.txt
+kt-media-root/**/*Zone.Identifier
 
+# working directories
 kt-media-root-processed*
-
 kt-media-root-temp
 
 # build output
@@ -19,6 +20,9 @@ target/
 
 # macOS-specific files
 .DS_Store
+
+# windows-specific files
+Thumbs.db
 
 # jetbrains setting folder
 .idea/

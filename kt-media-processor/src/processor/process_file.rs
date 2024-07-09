@@ -14,6 +14,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use image::io::Reader as ImageReader;
+use image::DynamicImage;
 use image::GenericImageView;
 
 use image::codecs::avif::AvifEncoder;
@@ -22,13 +23,11 @@ use image::codecs::webp::WebPEncoder;
 
 use std::time::Instant;
 
-use std::cmp;
-
 pub fn process_file(
     file_src_path: &Path,
     output_path: &Path,
     _media_file_meta: Ref<model::MediaFileMeta>,
-    mut media_file: RefMut<model::MediaFile>,
+    media_file: &mut model::MediaFile,
 ) -> Result<(), Box<dyn Error>> {
     //todo!();
 
@@ -150,96 +149,83 @@ pub fn process_file(
         // and the given meta, then skip actual final resizing and generation
         let expected_path = &output_path.join(&expected_subpath_ext_str);
 
-        if expected_path.exists()
-            && fs::metadata(expected_path).unwrap().modified()?
-                > file_src_path.metadata()?.modified()?
-        //&& (File::new(expected_path).metadata()?.modified()? > media_file.last_modified)
-        {
-            println!("Skipping: {}", expected_subpath_ext_str);
-            continue;
+        if expected_path.exists() {
+            let expected_last_modified = fs::metadata(expected_path).unwrap().modified()?;
+            if expected_last_modified >= file_src_path.metadata()?.modified()?
+                && expected_last_modified >= media_file.last_modified.into()
+            {
+                println!("Skipping: {}", expected_subpath_ext_str);
+                continue;
+            }
         }
 
         println!("Processing: {}", expected_subpath_ext_str);
-        // Resize and crop as needed
-        let img_out = match output_format.keep_aspect {
-            true => {
-                dbg!("keep_aspect");
-                dbg!(actual_dim_w);
-                dbg!(actual_dim_h);
-                dbg!(output_format);
 
-                if actual_dim_w < output_format.width || actual_dim_h < output_format.height {
-                    dbg!("clone");
-                    src_img.clone()
+        let img_out: DynamicImage;
+        if (actual_dim_w == src_dim_w && actual_dim_h == src_dim_h)
+            || src_dim_w < actual_dim_w
+            || src_dim_h < actual_dim_h
+        {
+            dbg!("clone");
+            img_out = src_img.to_owned();
+
+            //TODO: if keep_aspect is false, crop to center if one of the dimensions is larger
+        } else {
+            dbg!("resize");
+            let now = Instant::now();
+
+            if output_format.keep_aspect {
+                img_out = src_img.resize_exact(
+                    actual_dim_w,
+                    actual_dim_h,
+                    image::imageops::FilterType::Lanczos3,
+                );
+            } else {
+                // Calculate top-left corner for crop to center it
+                let src_ar = src_dim_w as f64 / src_dim_h as f64;
+                let req_ar = actual_dim_w as f64 / actual_dim_h as f64;
+                dbg!(src_ar);
+                dbg!(req_ar);
+
+                let (scale_width, scale_height) = if src_ar == req_ar {
+                    (actual_dim_w, actual_dim_h)
+                } else if src_ar > req_ar {
+                    // Scale based on height
+                    let scale_height = actual_dim_h;
+                    let scale_width =
+                        (src_dim_w as f64 * (scale_height as f64 / src_dim_h as f64)) as u32;
+                    (scale_width, scale_height)
                 } else {
-                    //src_img.thumbnail_exact(output_format.width, output_format.height),
-                    //we calculated actuals, so we use exact
-                    dbg!("resize");
-                    let now = Instant::now();
-                    let resized_img = src_img.resize_exact(
-                        actual_dim_w,
-                        actual_dim_h,
-                        image::imageops::FilterType::Lanczos3,
-                    );
-                    let elapsed = now.elapsed();
-                    println!(
-                        "{}, Resize Time: {:.2?}",
-                        &expected_subpath_ext_str, elapsed
-                    );
-                    resized_img
-                }
-            }
+                    // Scale based on width
+                    let scale_width = actual_dim_w;
+                    let scale_height =
+                        (src_dim_h as f64 * (scale_width as f64 / src_dim_w as f64)) as u32;
+                    (scale_width, scale_height)
+                };
 
-            false => {
-                if actual_dim_w < output_format.width || actual_dim_h < output_format.height {
-                    //src_img.clone()
-                    dbg!("too small");
-                    dbg!(actual_dim_w);
-                    dbg!(actual_dim_h);
-                    dbg!(output_format);
-                    src_img.resize_exact(
-                        actual_dim_w,
-                        actual_dim_h,
-                        image::imageops::FilterType::Lanczos3,
-                    )
-                    //TODO: debug here I guess
+                if src_dim_w == scale_width && src_dim_h == scale_height {
+                    img_out = src_img.to_owned();
                 } else {
-                    // Calculate top-left corner for crop to center it
-                    let src_ar = src_dim_w as f64 / src_dim_h as f64;
-                    let req_ar = actual_dim_w as f64 / actual_dim_h as f64;
-                    dbg!(src_ar);
-                    dbg!(req_ar);
-
-                    // let mut precrop_size = cmp::min(src_dim_w, actual_dim_w);
-                    // if src_ar < 1.0 && req_ar < 1.0 {
-                    //     precrop_size = cmp::min(src_dim_w, actual_dim_w);
-                    // } else if src_ar > 1.0 && req_ar > 1.0 {
-                    //     precrop_size = cmp::min(src_dim_h, actual_dim_h);
-                    // } else if src_ar > 1.0 && req_ar < 1.0 {
-                    //     precrop_size = cmp::min(src_dim_h, actual_dim_h);
-                    // } else if src_ar < 1.0 && req_ar > 1.0 {
-                    //     precrop_size = cmp::min(src_dim_w, actual_dim_w);
-                    // }
-
-                    let (scale_width, scale_height) = if src_ar > req_ar {
-                        // Scale based on height
-                        let scale_height = actual_dim_h;
-                        let scale_width =
-                            (src_dim_w as f64 * (scale_height as f64 / src_dim_h as f64)) as u32;
-                        (scale_width, scale_height)
-                    } else {
-                        // Scale based on width
-                        let scale_width = actual_dim_w;
-                        let scale_height =
-                            (src_dim_h as f64 * (scale_width as f64 / src_dim_w as f64)) as u32;
-                        (scale_width, scale_height)
-                    };
-
                     let resized_img = src_img.resize_exact(
                         scale_width,
                         scale_height,
                         image::imageops::FilterType::Lanczos3,
                     );
+
+                    // Calculate crop start points
+                    let crop_x = if scale_width > actual_dim_w {
+                        (scale_width - actual_dim_w) / 2
+                    } else {
+                        0
+                    };
+
+                    let crop_y = if scale_height > actual_dim_h {
+                        (scale_height - actual_dim_h) / 2
+                    } else {
+                        0
+                    };
+
+                    img_out = resized_img.crop_imm(crop_x, crop_y, actual_dim_w, actual_dim_h);
 
                     let (resized_dim_w, resized_dim_h) = resized_img.dimensions();
 
@@ -251,23 +237,15 @@ pub fn process_file(
 
                     dbg!(resized_dim_w);
                     dbg!(resized_dim_h);
-
-                    // Calculate crop start points
-                    let crop_x = if scale_width > actual_dim_w {
-                        (scale_width - actual_dim_w) / 2
-                    } else {
-                        0
-                    };
-                    let crop_y = if scale_height > actual_dim_h {
-                        (scale_height - actual_dim_h) / 2
-                    } else {
-                        0
-                    };
-
-                    resized_img.crop_imm(crop_x, crop_y, actual_dim_w, actual_dim_h)
                 }
             }
-        };
+
+            let elapsed = now.elapsed();
+            println!(
+                "{}, Resize Time: {:.2?}",
+                &expected_subpath_ext_str, elapsed
+            );
+        }
 
         let (dim_resized_w, dim_resized_h) = img_out.dimensions();
 
