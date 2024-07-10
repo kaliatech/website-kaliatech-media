@@ -25,30 +25,15 @@ use std::time::Instant;
 
 use super::config;
 
-pub fn process_file(
+pub fn process_file_image(
     src_path: &Path,
-    output_path: &Path,
+    dst_root_path: &Path,
+    dst_subpath_noext_str: &str,
     _media_file_meta: &model::MediaFileMeta,
     media_file: &mut model::MediaFile,
 ) -> Result<(), Box<dyn Error>> {
     //todo!();
 
-    let src_subpath_noext_str = format!(
-        "{}",
-        media_file
-            .path
-            .strip_prefix("/")
-            .unwrap_or(&media_file.path)
-            .trim_end_matches(&format!(
-                ".{}",
-                src_path.extension().unwrap_or_default().to_string_lossy()
-            ))
-    );
-    let src_subpath_noext = output_path.join(&src_subpath_noext_str);
-
-    if let Some(parent) = src_subpath_noext.parent() {
-        fs::create_dir_all(parent)?;
-    }
 
     // let g = ImageReader::open(file_src_path)?.with_guessed_format()?;
     // println!("Format: {}", g.format().unwrap().to_mime_type());
@@ -66,13 +51,13 @@ pub fn process_file(
     for output_format in &output_formats {
         // Generated expected output name
         let (expected_subpath_ext_str, actual_dim_w, actual_dim_h) =
-            generate_filename(&src_subpath_noext_str, output_format, src_dim_w, src_dim_h);
+            generate_filename(dst_subpath_noext_str, output_format, src_dim_w, src_dim_h);
 
         println!("Considering: {}", expected_subpath_ext_str);
 
         // If file exists and last_modified is after the last_modified of the source file
         // and the given meta, then skip actual final resizing and generation
-        let expected_path = &output_path.join(&expected_subpath_ext_str);
+        let expected_path = &dst_root_path.join(&expected_subpath_ext_str);
 
         if expected_path.exists() {
             let expected_last_modified = fs::metadata(expected_path).unwrap().modified()?;
@@ -221,35 +206,11 @@ pub fn process_file(
             })),
         );
 
-        media_file.last_modified = chrono::Utc::now();
     }
 
-    //img_1280x720.save(&file_img_1280x720_path)?;
+    // Loop through all variants to set most recent last_modified
 
-    // let (dim_w, dim_h) = img.dimensions();
-    // if dim_w > dim_h {
-    //     let file_img_1920w_path = file_img_1280x720_path
-    //         .with_file_name(
-    //             file_img_1280x720_path
-    //                 .file_stem()
-    //                 .expect("File should have a stem"),
-    //         )
-    //         .with_extension("1920w.avif");
-    //     let img_1920w = img.resize(1920, 1920, image::imageops::FilterType::Lanczos3);
-
-    //     img_1920w.save(&file_img_1920w_path)?;
-    // } else {
-    //     let file_img_1920w_path = file_img_1280x720_path
-    //         .with_file_name(
-    //             file_img_1280x720_path
-    //                 .file_stem()
-    //                 .expect("File should have a stem"),
-    //         )
-    //         .with_extension("1920h.avif");
-
-    //     let img_1920h = img.resize(1920, 1920, image::imageops::FilterType::Lanczos3);
-    //     img_1920h.save(&file_img_1920w_path)?;
-    // }
+    // Todo: Delete any files in output that are no longer valid
 
     return Ok(());
 }

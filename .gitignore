@@ -12,6 +12,9 @@ kt-media-root/**/*Zone.Identifier
 kt-media-root-processed*
 kt-media-root-temp
 
+# test files ...might eventually commit
+/kt-media-processor/test/test-vid-17s.mp4
+
 # build output
 target/
 
@@ -26,3 +29,4 @@ Thumbs.db
 
 # jetbrains setting folder
 .idea/
+

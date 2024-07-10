@@ -18,36 +18,20 @@ use super::ffmpeg::ffprobe_meta::FfprobeMeta;
 
 pub fn process_file_video(
     src_path: &Path,
-    output_path: &Path,
+    dst_root_path: &Path,
+    dst_subpath_noext_str: &str,
     _media_file_meta: &model::MediaFileMeta,
     media_file: &mut model::MediaFile,
 ) -> Result<(), Box<dyn Error>> {
-    //todo!();
 
-    let src_subpath_noext_str = format!(
-        "{}",
-        media_file
-            .path
-            .strip_prefix("/")
-            .unwrap_or(&media_file.path)
-            .trim_end_matches(&format!(
-                ".{}",
-                src_path.extension().unwrap_or_default().to_string_lossy()
-            ))
-    );
-    let dst_path_noext = output_path.join(&src_subpath_noext_str);
-
-    if let Some(parent) = dst_path_noext.parent() {
-        fs::create_dir_all(parent)?;
-    }
 
     //TODO: determine if thumbnail already exists and skip if so
-    let thumbnail_subpath_str = format!("{}.tn.avif", &src_subpath_noext_str);
-    let thumbnail_path = dst_path_noext.with_extension("tn.avif");
+    let thumbnail_subpath_str = format!("{}.tn.avif", &dst_subpath_noext_str);
+    let thumbnail_path = dst_root_path.join(&thumbnail_subpath_str);
 
     println!(
         "Considering: {}",
-        &thumbnail_path.to_str().unwrap_or("Invalid path")
+        thumbnail_subpath_str
     );
 
     if thumbnail_path.exists() {
@@ -61,12 +45,20 @@ pub fn process_file_video(
 
     println!(
         "Processing: {}",
-        &thumbnail_path.to_str().unwrap_or("Invalid path")
+        thumbnail_subpath_str
     );
 
     let tn_image = ffmpeg::extract_thumbnail(src_path)?;
 
     // Write thumbnail
+    let tn_parent_path = thumbnail_path.parent().unwrap();
+    if !tn_parent_path.exists() {
+        fs::create_dir_all(tn_parent_path)?;
+    }
+    if (!tn_parent_path.is_dir()) {
+        return Err("Destination parent path is a file instead of a directory".into());
+    }
+
     let file_out = &File::create(&thumbnail_path)?;
     let mut file_out_writer = BufWriter::new(file_out);
     let encoder = AvifEncoder::new_with_speed_quality(&mut file_out_writer, 4, 80);
@@ -92,10 +84,11 @@ pub fn process_file_video(
 
     // Copy source file (no transcoding, for now)
     // ...eventually `ffmpeg -i input.flv -vcodec libx264 -acodec aac output.mp4` ...or similar
+
     let dst_path_str = format!(
-        "{}{}",
-        output_path.to_str().unwrap_or_default(),
-        &media_file.path
+        "{}/{}",
+        tn_parent_path.to_str().unwrap(),
+        src_path.file_name().unwrap().to_str().unwrap()
     );
     let dst_path = Path::new(&dst_path_str);
     dbg!(&dst_path);

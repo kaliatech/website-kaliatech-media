@@ -41,8 +41,8 @@ pub fn scan_input_dir(input_path: &Path) -> Result<Box<ScanResult>, Box<dyn Erro
         Rc::new(RefCell::new(model::MediaAlbumMeta {
             title: None,
             ordinal: None,
-            last_modified_dir: Utc::now(), //TODO: get modified time of the root?
-            last_modified_override: Some(Utc::now()),
+            last_modified_dir: fs::metadata(input_path)?.modified()?.into(),
+            last_modified_override: None,
             sub_albums: HashMap::new(),
             media_files: HashMap::new(),
         })),
@@ -192,7 +192,7 @@ fn scan_file(
         let album_meta = Rc::new(RefCell::new(model::MediaAlbumMeta {
             title: album_meta_overrides.title,
             ordinal: album_meta_overrides.ordinal,
-            last_modified_dir: fs::metadata(file_path)?.modified()?.into(), // TODO: not used, could maybe set to optional in the model and then use the json object directly
+            last_modified_dir: fs::metadata(file_path)?.modified()?.into(),
             last_modified_override: album_meta_overrides.last_modified_override,
             sub_albums: HashMap::new(),
             media_files: HashMap::new(),
@@ -200,8 +200,6 @@ fn scan_file(
         media_album_jsons.insert(sub_path_str.clone(), Rc::clone(&album_meta));
         return Ok(());
     }
-
-    dbg!(file_path);
 
     if file_path
         .to_str()
@@ -212,7 +210,7 @@ fn scan_file(
         let file_meta = Rc::new(RefCell::new(model::MediaFileMeta {
             title: file_meta_overrides.title,
             ordinal: file_meta_overrides.ordinal,
-            last_modified_file: fs::metadata(file_path)?.modified()?.into(), // TODO: not used, could maybe set to optional in the model and then use the json object directly
+            last_modified_file: fs::metadata(file_path)?.modified()?.into(),
             last_modified_override: file_meta_overrides.last_modified_override,
         }));
         media_file_jsons.insert(
@@ -233,14 +231,6 @@ fn scan_file(
     }
 
     // If here, file is a media file we need to check and process
-    let last_modified_file = match file_path.metadata() {
-        Ok(metadata) => match metadata.modified() {
-            Ok(modified) => Some(DateTime::<Utc>::from(modified)),
-            Err(_) => None, // Handle the error or log it as needed
-        },
-        Err(_) => None, // Handle the error or log it as needed
-    };
-
     let media_file_meta = Rc::new(RefCell::new(model::MediaFileMeta {
         title: Some(
             file_path
@@ -250,7 +240,7 @@ fn scan_file(
                 .to_string(),
         ),
         ordinal: Some(0),
-        last_modified_file: last_modified_file.unwrap_or_default(),
+        last_modified_file: fs::metadata(file_path)?.modified()?.into(),
         last_modified_override: None,
     }));
 
