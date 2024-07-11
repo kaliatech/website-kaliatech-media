@@ -20,45 +20,53 @@ pub fn process_file_video(
     src_path: &Path,
     dst_root_path: &Path,
     dst_subpath_noext_str: &str,
-    _media_file_meta: &model::MediaFileMeta,
+    _media_file_meta: &model::MediaFileSource,
     media_file: &mut model::MediaFile,
 ) -> Result<(), Box<dyn Error>> {
-
-
-    //TODO: determine if thumbnail already exists and skip if so
     let thumbnail_subpath_str = format!("{}.tn.avif", &dst_subpath_noext_str);
-    let thumbnail_path = dst_root_path.join(&thumbnail_subpath_str);
+    let thumbnail_path_str = &format!("{}{}", dst_root_path.to_string_lossy(), &thumbnail_subpath_str);
+    let thumbnail_path = &Path::new(thumbnail_path_str);
 
-    println!(
-        "Considering: {}",
-        thumbnail_subpath_str
+    let tn_parent_path = thumbnail_path.parent().unwrap();
+    if !tn_parent_path.exists() {
+        fs::create_dir_all(tn_parent_path)?;
+    }
+    if !tn_parent_path.is_dir() {
+        return Err("Destination parent path is a file instead of a directory".into());
+    }
+
+    let video_dst_path_str = format!(
+        "{}/{}",
+        tn_parent_path.to_str().unwrap(),
+        src_path.file_name().unwrap().to_str().unwrap()
     );
+    let video_dst_path = Path::new(&video_dst_path_str);
+
+    // println!(
+    //     "Considering: {}",
+    //     thumbnail_subpath_str
+    // );
 
     if thumbnail_path.exists() {
         let tn_last_modified = fs::metadata(&thumbnail_path).unwrap().modified()?;
         if tn_last_modified >= src_path.metadata()?.modified()?
             && tn_last_modified >= media_file.last_modified.into()
         {
-            return Ok(());
+            // Also check if dst_path exists in case thumbnail was created, but video was not output/copied due to errors
+            if video_dst_path.exists() {
+                return Ok(());
+            }
         }
     }
 
     println!(
-        "Processing: {}",
+        "  Processing: {}",
         thumbnail_subpath_str
     );
 
     let tn_image = ffmpeg::extract_thumbnail(src_path)?;
 
     // Write thumbnail
-    let tn_parent_path = thumbnail_path.parent().unwrap();
-    if !tn_parent_path.exists() {
-        fs::create_dir_all(tn_parent_path)?;
-    }
-    if (!tn_parent_path.is_dir()) {
-        return Err("Destination parent path is a file instead of a directory".into());
-    }
-
     let file_out = &File::create(&thumbnail_path)?;
     let mut file_out_writer = BufWriter::new(file_out);
     let encoder = AvifEncoder::new_with_speed_quality(&mut file_out_writer, 4, 80);
@@ -84,21 +92,18 @@ pub fn process_file_video(
 
     // Copy source file (no transcoding, for now)
     // ...eventually `ffmpeg -i input.flv -vcodec libx264 -acodec aac output.mp4` ...or similar
-
-    let dst_path_str = format!(
-        "{}/{}",
-        tn_parent_path.to_str().unwrap(),
-        src_path.file_name().unwrap().to_str().unwrap()
-    );
-    let dst_path = Path::new(&dst_path_str);
-    dbg!(&dst_path);
-    fs::copy(src_path, dst_path)?;
+    fs::copy(src_path, video_dst_path)?;
 
     let ffprobe_meta = ffmpeg::extract_meta(src_path)?;
 
-    // Add source file as a varient
+    // Add source file as a variant
+    let source_subpath_str = dst_subpath_noext_str
+        .rsplit_once('/')
+        .map_or("", |(left, _)| left);
+    let source_subpath_str = format!("{}/{}", source_subpath_str, video_dst_path.file_name().unwrap().to_str().unwrap());
+
     media_file.variants.insert(
-        media_file.path.clone(),
+        source_subpath_str.clone(),
         Rc::new(RefCell::new(model::MediaFileVariant {
             path: media_file.path.clone(),
             mime_type: get_mime_type(&ffprobe_meta),

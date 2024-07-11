@@ -12,8 +12,8 @@ use std::io;
 use indexmap::IndexMap;
 
 pub fn apply_album_meta_jsons(
-    media_album_metas: &mut IndexMap<String, Rc<RefCell<model::MediaAlbumMeta>>>,
-    media_album_jsons: &mut HashMap<String, Rc<RefCell<model::MediaAlbumMeta>>>,
+    media_album_metas: &mut IndexMap<String, Rc<RefCell<model::MediaAlbumSource>>>,
+    media_album_jsons: &mut HashMap<String, Rc<RefCell<model::MediaAlbumSource>>>,
 ) -> Result<(), Box<dyn Error>> {
     //let mut to_remove = Vec::new();
 
@@ -37,6 +37,12 @@ pub fn apply_album_meta_jsons(
         if let Some(ordinal) = &album_json.ordinal {
             album_meta.borrow_mut().ordinal = Some(*ordinal);
         }
+
+        // Override thumbnail (optional)
+        if let Some(thumbnail) = &album_json.thumbnail {
+            album_meta.borrow_mut().thumbnail = Some(thumbnail.clone());
+        }
+
 
         // Override descr (optional)
     }

@@ -29,7 +29,7 @@ pub fn process_file_image(
     src_path: &Path,
     dst_root_path: &Path,
     dst_subpath_noext_str: &str,
-    _media_file_meta: &model::MediaFileMeta,
+    _media_file_meta: &model::MediaFileSource,
     media_file: &mut model::MediaFile,
 ) -> Result<(), Box<dyn Error>> {
     //todo!();
@@ -53,23 +53,24 @@ pub fn process_file_image(
         let (expected_subpath_ext_str, actual_dim_w, actual_dim_h) =
             generate_filename(dst_subpath_noext_str, output_format, src_dim_w, src_dim_h);
 
-        println!("Considering: {}", expected_subpath_ext_str);
+        //println!("Considering: {}", expected_subpath_ext_str);
 
         // If file exists and last_modified is after the last_modified of the source file
         // and the given meta, then skip actual final resizing and generation
-        let expected_path = &dst_root_path.join(&expected_subpath_ext_str);
+        let expected_path_str = format!("{}{}", dst_root_path.to_string_lossy(), expected_subpath_ext_str);
+        let expected_path = Path::new(&expected_path_str);
 
         if expected_path.exists() {
             let expected_last_modified = fs::metadata(expected_path).unwrap().modified()?;
             if expected_last_modified >= src_path.metadata()?.modified()?
                 && expected_last_modified >= media_file.last_modified.into()
             {
-                println!("Skipping: {}", expected_subpath_ext_str);
+                //println!("Skipping: {}", expected_subpath_ext_str);
                 continue;
             }
         }
 
-        println!("Processing: {}", expected_subpath_ext_str);
+        println!("  Processing: {}", expected_subpath_ext_str);
 
         let img_out: DynamicImage;
         if (actual_dim_w == src_dim_w && actual_dim_h == src_dim_h)
@@ -182,8 +183,8 @@ pub fn process_file_image(
                 //encoder = encoder.with_num_threads(Some(8));
                 img_out.write_with_encoder(encoder)?;
             } // _ => {
-              //     eprintln!("Unsupported encoding");
-              // }
+            //     eprintln!("Unsupported encoding");
+            // }
         };
         let elapsed = now.elapsed();
         println!("{}, Write Time: {:.2?}", &expected_subpath_ext_str, elapsed);
@@ -205,12 +206,10 @@ pub fn process_file_image(
                 is_thumbnail: !output_format.keep_aspect,
             })),
         );
-
     }
 
-    // Loop through all variants to set most recent last_modified
-
-    // Todo: Delete any files in output that are no longer valid
+    // TBD: set most recent last_modified on the media_file?
 
     return Ok(());
 }
+

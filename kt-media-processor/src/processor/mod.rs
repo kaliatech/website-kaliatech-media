@@ -17,3 +17,6 @@ mod ffmpeg;
 
 mod config;
 
+mod clean_dst_dir;
+pub use clean_dst_dir::clean_dst_dir;
+

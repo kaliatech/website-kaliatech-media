@@ -20,8 +20,8 @@ use std::error::Error;
 use indexmap::IndexMap;
 
 pub struct ScanResult {
-    pub media_album_metas: IndexMap<String, Rc<RefCell<model::MediaAlbumMeta>>>,
-    pub media_file_metas: IndexMap<String, Rc<RefCell<model::MediaFileMeta>>>,
+    pub media_album_metas: IndexMap<String, Rc<RefCell<model::MediaAlbumSource>>>,
+    pub media_file_metas: IndexMap<String, Rc<RefCell<model::MediaFileSource>>>,
 }
 
 pub fn scan_input_dir(input_path: &Path) -> Result<Box<ScanResult>, Box<dyn Error>> {
@@ -29,19 +29,20 @@ pub fn scan_input_dir(input_path: &Path) -> Result<Box<ScanResult>, Box<dyn Erro
     let files = utils::glob_files(input_path.as_ref());
 
     // Hashmaps to store all meta objects for albums and files
-    let mut media_album_metas: IndexMap<String, Rc<RefCell<model::MediaAlbumMeta>>> =
+    let mut media_album_metas: IndexMap<String, Rc<RefCell<model::MediaAlbumSource>>> =
         IndexMap::new();
-    let mut media_album_jsons: HashMap<String, Rc<RefCell<model::MediaAlbumMeta>>> = HashMap::new();
-    let mut media_file_metas: IndexMap<String, Rc<RefCell<model::MediaFileMeta>>> = IndexMap::new();
-    let mut media_file_jsons: HashMap<String, Rc<RefCell<model::MediaFileMeta>>> = HashMap::new();
+    let mut media_album_jsons: HashMap<String, Rc<RefCell<model::MediaAlbumSource>>> = HashMap::new();
+    let mut media_file_metas: IndexMap<String, Rc<RefCell<model::MediaFileSource>>> = IndexMap::new();
+    let mut media_file_jsons: HashMap<String, Rc<RefCell<model::MediaFileSource>>> = HashMap::new();
 
     // Manually insert the root album
     media_album_metas.insert(
         String::from(""),
-        Rc::new(RefCell::new(model::MediaAlbumMeta {
+        Rc::new(RefCell::new(model::MediaAlbumSource {
             title: None,
             ordinal: None,
             last_modified_dir: fs::metadata(input_path)?.modified()?.into(),
+            thumbnail: None,
             last_modified_override: None,
             sub_albums: HashMap::new(),
             media_files: HashMap::new(),
@@ -78,7 +79,7 @@ pub fn scan_input_dir(input_path: &Path) -> Result<Box<ScanResult>, Box<dyn Erro
                 &mut media_file_metas,
                 &mut media_file_jsons,
             )
-            .expect("Unable to scan file");
+                .expect("Unable to scan file");
         }
     }
 
@@ -102,7 +103,7 @@ fn scan_dir(
     parent_path: &Path,
     sub_path: &Path,
     //    _media_album_meta: &Entry<String, Rc<RefCell<model::MediaAlbumMeta>>>,
-    media_album_metas: &mut IndexMap<String, Rc<RefCell<model::MediaAlbumMeta>>>,
+    media_album_metas: &mut IndexMap<String, Rc<RefCell<model::MediaAlbumSource>>>,
 ) {
     let last_modified_dir = match dir.metadata() {
         Ok(metadata) => match metadata.modified() {
@@ -112,14 +113,14 @@ fn scan_dir(
         Err(_) => None, // Handle the error or log it as needed
     };
 
-    let new_media_album = Rc::new(RefCell::new(model::MediaAlbumMeta {
-        title: sub_path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .map(|s| s.to_string()),
+    let title_def = sub_path.file_name().map(|s| s.to_str().unwrap().to_string());
+
+    let new_media_album = Rc::new(RefCell::new(model::MediaAlbumSource {
+        title: title_def,
         ordinal: None,
         last_modified_override: None,
         last_modified_dir: last_modified_dir.unwrap_or_default(),
+        thumbnail: None,
         sub_albums: HashMap::new(),
         media_files: HashMap::new(),
     }));
@@ -135,15 +136,13 @@ fn scan_dir(
         .unwrap_or_default()
         .trim_start_matches(input_path.to_str().unwrap_or_default());
 
-    dbg!(&parent_sub_path_str);
-
     let media_album_meta = media_album_metas.get(parent_sub_path_str);
     if media_album_meta.is_none() {
         eprint!("Missing parent");
     } else {
         let media_album_meta = media_album_meta.unwrap();
         media_album_meta.borrow_mut().sub_albums.insert(
-            format!("/{}/", sub_path.to_string_lossy()),
+            format!("/{}", sub_path.to_string_lossy()),
             Rc::clone(&new_media_album),
         );
     }
@@ -174,10 +173,10 @@ fn scan_file(
     file_path: &Path,
     parent_path: &Path,
     sub_path: &Path,
-    media_album_metas: &mut IndexMap<String, Rc<RefCell<model::MediaAlbumMeta>>>,
-    media_album_jsons: &mut HashMap<String, Rc<RefCell<model::MediaAlbumMeta>>>,
-    media_file_metas: &mut IndexMap<String, Rc<RefCell<model::MediaFileMeta>>>,
-    media_file_jsons: &mut HashMap<String, Rc<RefCell<model::MediaFileMeta>>>,
+    media_album_metas: &mut IndexMap<String, Rc<RefCell<model::MediaAlbumSource>>>,
+    media_album_jsons: &mut HashMap<String, Rc<RefCell<model::MediaAlbumSource>>>,
+    media_file_metas: &mut IndexMap<String, Rc<RefCell<model::MediaFileSource>>>,
+    media_file_jsons: &mut HashMap<String, Rc<RefCell<model::MediaFileSource>>>,
 ) -> Result<(), Box<dyn Error>> {
     let sub_path_str = format!("/{}", sub_path.to_string_lossy());
     // let file_path_str = format!(
@@ -188,12 +187,13 @@ fn scan_file(
     // let file_path = Path::new(&formatted_path);
 
     if file_path.ends_with("album-meta.json") {
-        let album_meta_overrides: model::MediaAlbumMeta = read_object_from_json_file(file_path)?;
-        let album_meta = Rc::new(RefCell::new(model::MediaAlbumMeta {
+        let album_meta_overrides: model::MediaAlbumSource = read_object_from_json_file(file_path)?;
+        let album_meta = Rc::new(RefCell::new(model::MediaAlbumSource {
             title: album_meta_overrides.title,
             ordinal: album_meta_overrides.ordinal,
             last_modified_dir: fs::metadata(file_path)?.modified()?.into(),
             last_modified_override: album_meta_overrides.last_modified_override,
+            thumbnail: album_meta_overrides.thumbnail,
             sub_albums: HashMap::new(),
             media_files: HashMap::new(),
         }));
@@ -206,8 +206,8 @@ fn scan_file(
         .unwrap_or_default()
         .ends_with("-meta.json")
     {
-        let file_meta_overrides: model::MediaFileMeta = read_object_from_json_file(file_path)?;
-        let file_meta = Rc::new(RefCell::new(model::MediaFileMeta {
+        let file_meta_overrides: model::MediaFileSource = read_object_from_json_file(file_path)?;
+        let file_meta = Rc::new(RefCell::new(model::MediaFileSource {
             title: file_meta_overrides.title,
             ordinal: file_meta_overrides.ordinal,
             last_modified_file: fs::metadata(file_path)?.modified()?.into(),
@@ -231,7 +231,7 @@ fn scan_file(
     }
 
     // If here, file is a media file we need to check and process
-    let media_file_meta = Rc::new(RefCell::new(model::MediaFileMeta {
+    let media_file_meta = Rc::new(RefCell::new(model::MediaFileSource {
         title: Some(
             file_path
                 .file_name()
@@ -239,7 +239,7 @@ fn scan_file(
                 .unwrap_or("")
                 .to_string(),
         ),
-        ordinal: Some(0),
+        ordinal: Some(-1),
         last_modified_file: fs::metadata(file_path)?.modified()?.into(),
         last_modified_override: None,
     }));

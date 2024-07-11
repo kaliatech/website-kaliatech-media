@@ -15,7 +15,7 @@ use crate::utils;
 // }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct MediaAlbumMeta {
+pub struct MediaAlbumSource {
     #[serde(default)]
     pub title: Option<String>,
     pub ordinal: Option<i32>,
@@ -35,9 +35,14 @@ pub struct MediaAlbumMeta {
     pub last_modified_dir: DateTime<Utc>,
 
     #[serde(default)]
-    pub sub_albums: HashMap<String, Rc<RefCell<MediaAlbumMeta>>>,
+    pub thumbnail: Option<String>,
+
     #[serde(default)]
-    pub media_files: HashMap<String, Rc<RefCell<MediaFileMeta>>>,
+    pub sub_albums: HashMap<String, Rc<RefCell<MediaAlbumSource>>>,
+
+    #[serde(default)]
+    pub media_files: HashMap<String, Rc<RefCell<MediaFileSource>>>,
+
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -56,7 +61,7 @@ pub struct MediaEncodingRequest {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct MediaFileMeta {
+pub struct MediaFileSource {
     #[serde(default)]
     pub title: Option<String>,
     pub ordinal: Option<i32>,
@@ -80,13 +85,19 @@ pub struct MediaAlbum {
     pub path: String,
     pub title: String,
     pub ordinal: i32,
+
     #[serde(
         serialize_with = "utils::serialize_dt",
         deserialize_with = "utils::deserialize_dt"
     )]
     pub last_modified_dir: DateTime<Utc>,
+
+    #[serde(default)]
+    pub thumbnail: Option<String>,
+
     pub sub_albums: IndexMap<String, Rc<RefCell<MediaAlbum>>>,
     pub media_files: IndexMap<String, Rc<RefCell<MediaFile>>>,
+
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

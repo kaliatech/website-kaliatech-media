@@ -10,8 +10,8 @@ use std::error::Error;
 use indexmap::IndexMap;
 
 pub fn apply_file_meta_jsons(
-    media_file_metas: &mut IndexMap<String, Rc<RefCell<model::MediaFileMeta>>>,
-    media_file_jsons: &mut HashMap<String, Rc<RefCell<model::MediaFileMeta>>>,
+    media_file_metas: &mut IndexMap<String, Rc<RefCell<model::MediaFileSource>>>,
+    media_file_jsons: &mut HashMap<String, Rc<RefCell<model::MediaFileSource>>>,
 ) -> Result<(), Box<dyn Error>> {
     //let mut to_remove = Vec::new();
 
@@ -35,11 +35,9 @@ pub fn apply_file_meta_jsons(
         // Override lastmodified (optional)
 
         // Override ordinal (optional)
-        // if let Some(ordinal) = media_album_json.ordinal {
-        //     if let Entry::Occupied(mut o) = media_album_metas.entry(parent_sub_path.to_string()) {
-        //         o.get_mut().borrow_mut().ordinal = Some(ordinal);
-        //     }
-        // }
+        if let Some(ordinal) = &media_file_json.ordinal {
+            media_file_meta3.ordinal = Some(*ordinal);
+        }
 
         // Override descr (optional)
     }
