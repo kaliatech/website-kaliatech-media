@@ -1,11 +1,13 @@
 use std::path::Path;
 
-pub mod model;
+mod model;
 pub mod processor;
 pub mod scanner;
 pub mod utils;
 
 pub mod sync;
+
+pub mod watcher;
 
 
 pub fn scan_and_process_media(
