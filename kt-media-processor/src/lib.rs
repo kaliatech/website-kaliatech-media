@@ -5,6 +5,9 @@ pub mod processor;
 pub mod scanner;
 pub mod utils;
 
+pub mod sync;
+
+
 pub fn scan_and_process_media(
     in_dir: &str,
     out_dir: &str,
@@ -27,4 +30,14 @@ pub fn scan_and_process_media(
     //println!("Processed: {}", processed_data);
 
     Ok(())
+}
+
+
+pub async fn do_s3_sync(
+    local_dir: &str,
+    s3_url: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let _local_dir_path = Path::new(local_dir);
+
+    let result = sync::do_s3_sync(local_dir, s3_url);
+    return result.await;
 }

@@ -12,7 +12,8 @@ use image::GenericImageView;
 
 use std::cell::RefCell;
 use std::rc::Rc;
-
+use std::time::SystemTime;
+use chrono::{DateTime, Utc};
 use super::ffmpeg;
 use super::ffmpeg::ffprobe_meta::FfprobeMeta;
 
@@ -50,7 +51,7 @@ pub fn process_file_video(
     if thumbnail_path.exists() {
         let tn_last_modified = fs::metadata(&thumbnail_path).unwrap().modified()?;
         if tn_last_modified >= src_path.metadata()?.modified()?
-            && tn_last_modified >= media_file.last_modified.into()
+            && tn_last_modified >= <DateTime<Utc> as Into<SystemTime>>::into(media_file.last_modified)
         {
             // Also check if dst_path exists in case thumbnail was created, but video was not output/copied due to errors
             if video_dst_path.exists() {

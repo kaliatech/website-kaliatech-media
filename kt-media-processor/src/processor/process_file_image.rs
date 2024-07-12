@@ -22,6 +22,10 @@ use image::codecs::jpeg::JpegEncoder;
 use image::codecs::webp::WebPEncoder;
 
 use std::time::Instant;
+use std::time::SystemTime;
+
+use chrono::DateTime;
+use chrono::Utc;
 
 use super::config;
 
@@ -63,7 +67,7 @@ pub fn process_file_image(
         if expected_path.exists() {
             let expected_last_modified = fs::metadata(expected_path).unwrap().modified()?;
             if expected_last_modified >= src_path.metadata()?.modified()?
-                && expected_last_modified >= media_file.last_modified.into()
+                && expected_last_modified >= <DateTime<Utc> as Into<SystemTime>>::into(media_file.last_modified)
             {
                 //println!("Skipping: {}", expected_subpath_ext_str);
                 continue;

@@ -203,11 +203,11 @@ pub fn process_album(
                     e
                 );
                 // Remove this entry if errors occur while processing
-                media_files_to_remove.push(media_file_meta_path);
+                media_files_to_remove.push(media_file_meta_path.clone());
                 continue;
             };
 
-            // Clean up dst director and any left over variants for a previous run
+            // Clean up dst director and any left over variants from a previous run
             let dst_path_noext_str = &format!("{}{}", output_path.to_string_lossy(), &dst_subpath_noext_str);
             //let dst_subpath_parent_str = Path::new(&dst_subpath_noext_str).parent().unwrap().file_name().unwrap_or_default().to_string_lossy().to_string();
             let dst_path_noext = Path::new(dst_path_noext_str);
@@ -216,6 +216,15 @@ pub fn process_album(
             processor::clean_dst_dir(&output_path, &dst_parent_path, &mut *media_file)?;
         }
     }
+
+    // Remove media files that do no longer exist in source
+    media_album.media_files.iter().for_each(|(path, _)| {
+        let src_path_str = format!("{}{}", output_path.to_string_lossy(), &path);
+        let src_path = Path::new(&src_path_str);
+        if !src_path.exists() {
+            media_files_to_remove.push(path.clone());
+        }
+    });
 
     // Remove all media files with errors that occurred while processing
     media_files_to_remove
@@ -259,6 +268,23 @@ pub fn process_album(
             }
         }
     }
+
+    // Remove any sub_albums that no longer exist
+    let mut sub_albums_to_remove = Vec::new();
+    media_album.sub_albums.iter().for_each(|(path, _)| {
+        let src_path_str = format!("{}{}", output_path.to_string_lossy(), &path);
+        let src_path = Path::new(&src_path_str);
+        if !src_path.exists() {
+            sub_albums_to_remove.push(path.clone());
+        }
+    });
+    sub_albums_to_remove
+        .iter()
+        .for_each(|sub_album_meta_path| {
+            media_album
+                .sub_albums
+                .shift_remove(&sub_album_meta_path.to_string());
+        });
 
     media_album.sub_albums.sort_keys();
     media_album.media_files.sort_keys();
