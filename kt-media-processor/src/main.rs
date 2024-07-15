@@ -16,13 +16,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 
     let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
-    ctrlc::set_handler(move || {
-        r.store(false, Ordering::SeqCst);
-        //TODO: Need to restructure to allow drop of tx/rx channels
-        //TODO: A ctrl-c should also be able to stop the recursive album processing, etc
-        //watcher::interrupt_watcher();
-    })?;
+    // let r = running.clone();
+    // ctrlc::set_handler(move || {
+    //     r.store(false, Ordering::SeqCst);
+    //     //TODO: Need to restructure to allow drop of tx/rx channels
+    //     //TODO: A ctrl-c should also be able to stop the recursive album processing, etc
+    //     //watcher::interrupt_watcher();
+    // })?;
 
     println!("Starting kt-media-processor...");
 
