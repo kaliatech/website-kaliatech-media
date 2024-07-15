@@ -39,11 +39,17 @@ pub fn get_output_formats() -> Vec<model::MediaEncodingRequest> {
         //     keep_aspect: true,
         // },
         model::MediaEncodingRequest {
-            width: 1280,
-            height: 720,
+            width: 640,
+            height: 360,
             encoding: model::Encoding::AVIF,
             keep_aspect: false,
         },
+        // model::MediaEncodingRequest {
+        //     width: 1280,
+        //     height: 720,
+        //     encoding: model::Encoding::AVIF,
+        //     keep_aspect: false,
+        // },
         model::MediaEncodingRequest {
             width: 1920,
             height: 1080,
