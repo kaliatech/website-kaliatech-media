@@ -4,10 +4,16 @@ use s3sync::pipeline::Pipeline;
 use s3sync::types::token::create_pipeline_cancellation_token;
 
 pub async fn do_s3_sync(local_dir: &str,
+                        aws_profile: Option<&str>,
                         s3_url: &str) -> Result<(), Box<dyn std::error::Error>> {
 
     // You can use all the arguments for sync binary here.
-    let args = vec!["s3sync", "--target-profile", "kt-media-processor", "--delete", local_dir, s3_url];
+    let mut args = vec!["s3sync", "--delete", local_dir, s3_url];
+
+    if let Some(aws_profile) = aws_profile {
+        args.push("--target-profile");
+        args.push(aws_profile);
+    }
 
     // sync library converts the arguments to Config.
     let config = Config::try_from(parse_from_args(args).unwrap()).unwrap();

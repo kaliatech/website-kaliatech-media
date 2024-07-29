@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -13,6 +14,11 @@ use crate::utils;
 // pub struct MediaRoot {
 //     pub albums: HashMap<String, MediaAlbum>,
 // }
+
+//https://stackoverflow.com/a/64949136/123378
+//#[serde_as]
+// but with IndexMap, this instead: #[serde(with = "indexmap::map::serde_seq")]
+
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MediaAlbumSource {
@@ -37,9 +43,11 @@ pub struct MediaAlbumSource {
     #[serde(default)]
     pub thumbnail: Option<String>,
 
+    // #[serde(with = "indexmap::map::serde_seq")]
     #[serde(default)]
     pub sub_albums: HashMap<String, Rc<RefCell<MediaAlbumSource>>>,
 
+    // #[serde(with = "indexmap::map::serde_seq")]
     #[serde(default)]
     pub media_files: HashMap<String, Rc<RefCell<MediaFileSource>>>,
 
@@ -95,7 +103,10 @@ pub struct MediaAlbum {
     #[serde(default)]
     pub thumbnail: Option<String>,
 
+    #[serde(with = "indexmap::map::serde_seq")]
     pub sub_albums: IndexMap<String, Rc<RefCell<MediaAlbum>>>,
+
+    #[serde(with = "indexmap::map::serde_seq")]
     pub media_files: IndexMap<String, Rc<RefCell<MediaFile>>>,
 
 }
@@ -113,6 +124,8 @@ pub struct MediaFile {
     pub last_modified: DateTime<Utc>,
     pub width: u32,
     pub height: u32,
+
+    #[serde(with = "indexmap::map::serde_seq")]
     pub variants: IndexMap<String, Rc<RefCell<MediaFileVariant>>>,
 }
 

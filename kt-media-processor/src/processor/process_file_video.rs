@@ -106,7 +106,7 @@ pub fn process_file_video(
     media_file.variants.insert(
         source_subpath_str.clone(),
         Rc::new(RefCell::new(model::MediaFileVariant {
-            path: media_file.path.clone(),
+            path: source_subpath_str.clone(),
             mime_type: get_mime_type(&ffprobe_meta),
             width: ffprobe_meta.streams[0].width,
             height: ffprobe_meta.streams[0].height,

@@ -37,9 +37,10 @@ pub fn scan_and_process_media(
 
 pub async fn do_s3_sync(
     local_dir: &str,
+    aws_profile: Option<&str>,
     s3_url: &str) -> Result<(), Box<dyn std::error::Error>> {
     let _local_dir_path = Path::new(local_dir);
 
-    let result = sync::do_s3_sync(local_dir, s3_url);
+    let result = sync::do_s3_sync(local_dir, aws_profile, s3_url);
     return result.await;
 }

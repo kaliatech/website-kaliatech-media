@@ -32,7 +32,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!("Syncing to S3...");
         //do_s3_sync(&args.out_dir, &args.bucket_name)?;
-        do_s3_sync(&args.out_dir, "s3://kaliatech-media/kt-processor-test1/").await?;
+        //do_s3_sync(&args.out_dir, Some("kt-media-processor"), "s3://kaliatech-media/kt-processor-test1/").await?;
+        if let (Some(aws_profile), Some(s3_url)) = (&args.aws_profile, &args.s3_url) {
+            do_s3_sync(&args.out_dir, Some(aws_profile.as_str()), &s3_url).await?;
+        }
 
         log::info!("Watching for changes...");
         watcher::start_watcher(&args.in_dir)?;
