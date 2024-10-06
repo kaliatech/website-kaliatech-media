@@ -219,7 +219,7 @@ pub fn process_album(
 
     // Remove media files that do no longer exist in source
     media_album.media_files.iter().for_each(|(path, _)| {
-        let src_path_str = format!("{}{}", output_path.to_string_lossy(), &path);
+        let src_path_str = format!("{}{}", input_path.to_string_lossy(), &path);
         let src_path = Path::new(&src_path_str);
         if !src_path.exists() {
             media_files_to_remove.push(path.clone());
